@@ -1,0 +1,73 @@
+bot:
+  defaults:
+    # Fichier .bbot relatif au dossier du plugin (plugins/BlurpBot/…)
+    behavior-tree: trees/default.bbot
+    # Affiche le bot dans la player list (tab) quand c'est un fake player NMS.
+    tab-visible: true
+    # skin-texture / skin-signature: propriété "textures" complète (recommandé pour un skin figé)
+    # skin-texture: <base64_textures_value>
+    # skin-signature: <optional_signature>
+    attack-range: 2.6
+    stop-range: 2.4
+    attack-cooldown-ms: 550
+    priority-attack: 100
+    priority-move: 50
+    priority-idle: 1
+    sprint-enabled: true
+    move-speed-sprint: 0.42
+    move-speed-walk: 0.35
+    move-speed-backward: 0.11
+    move-speed-climb: 0.11
+    jump-velocity: 0.48
+    strafe-jitter-strength: 0.08
+    # Budget nœuds A* (normal / bloqué) — réduire si MSPT monte quand le bot pathfind.
+    path-max-visited-nodes: 1400
+    path-max-visited-nodes-stuck: 480
+    path-repath-interval-ms: 350
+    path-wall-proximity-penalty: 0.14
+    path-void-penalty: 2.5
+    path-fall-risk-penalty: 0.7
+    path-enemy-proximity-penalty: 0.35
+    path-climb-upward-bonus: 0.38
+    path-max-step-up: 1
+    path-max-step-down: 2
+    path-retry-on-fail-ms: 280
+    stuck-threshold-ground-ticks: 4
+    stuck-threshold-climb-ticks: 28
+    unstuck-duration-ms: 850
+    step-snap-up-max: 0.66
+    step-snap-down-max: 0.24
+    edge-slide-forward-min: 0.08
+    edge-slide-forward-max: 0.20
+    edge-slide-lateral-min: 0.10
+    edge-slide-lateral-max: 0.22
+    edge-slide-samples: 3
+    jump-intent-min-dy: 0.48
+    jump-intent-max-dy: 1.35
+    jump-intent-max-horiz: 1.75
+    jump-intent-ticks: 8
+  profiles:
+    # Exemple : arbre .bbot dédié + stats combat (voir trees/aggressive.bbot)
+    aggressive_btree:
+      behavior-tree: trees/aggressive.bbot
+      attack-range: 3.0
+      stop-range: 2.7
+      attack-cooldown-ms: 450
+      priority-attack: 120
+      priority-move: 45
+      priority-idle: 1
+    aggressive:
+      attack-range: 3.0
+      stop-range: 2.7
+      attack-cooldown-ms: 450
+      priority-attack: 120
+      priority-move: 45
+      priority-idle: 1
+    defensive:
+      attack-range: 2.4
+      stop-range: 2.9
+      attack-cooldown-ms: 700
+      priority-attack: 90
+      priority-move: 60
+      priority-idle: 1
+

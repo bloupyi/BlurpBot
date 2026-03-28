@@ -1,0 +1,33 @@
+# Arbre équivalent au comportement Java par défaut (chase → attaque → idle).
+# Les lignes `set` appliquent des valeurs aux BotSettings au chargement (même clés que config.yml / /sb config).
+# Les références $clé lisent les réglages à l'exécution (modifiables en jeu).
+
+version 1
+
+set priority-attack 100
+set priority-move 50
+set priority-idle 1
+
+bot "default" {
+  root priority_selector {
+    node attack {
+      priority: $priority-attack
+      when: sequence {
+        condition target_in_range { range: $attack-range }
+        condition has_melee_los {}
+      }
+      leaf attack_target { cooldown_ms: $attack-cooldown-ms }
+    }
+    node move {
+      priority: $priority-move
+      when: sequence {
+        condition has_active_goal {}
+      }
+      leaf move_to_goal { stop_range: $stop-range }
+    }
+    node idle {
+      priority: $priority-idle
+      leaf idle {}
+    }
+  }
+}

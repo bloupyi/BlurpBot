@@ -1,0 +1,28 @@
+# Même logique que default.bbot, sans directives `set` : les priorités / portées
+# viennent du profil config.yml (ou des défauts) via les références $clé.
+
+version 1
+
+bot "aggressive" {
+  root priority_selector {
+    node attack {
+      priority: $priority-attack
+      when: sequence {
+        condition target_in_range { range: $attack-range }
+        condition has_melee_los {}
+      }
+      leaf attack_target { cooldown_ms: $attack-cooldown-ms }
+    }
+    node move {
+      priority: $priority-move
+      when: sequence {
+        condition has_active_goal {}
+      }
+      leaf move_to_goal { stop_range: $stop-range }
+    }
+    node idle {
+      priority: $priority-idle
+      leaf idle {}
+    }
+  }
+}

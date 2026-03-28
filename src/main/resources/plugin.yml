@@ -1,0 +1,16 @@
+name: BlurpBot
+version: '1.0-SNAPSHOT'
+main: fr.bloup.blurpbot.BlurpBot
+api-version: '1.21'
+authors: [ bloup ]
+commands:
+  bb:
+    usage: "/<command>"
+permissions:
+  bb.*:
+    default: op
+    children:
+      bb.command:
+        default: true
+      bb.admin:
+        default: op

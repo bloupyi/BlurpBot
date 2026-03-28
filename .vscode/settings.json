@@ -1,0 +1,19 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "maven.terminal.favorites": [
+        {
+            "command": "mvn clean package -f pom.xml",
+            "debug": false
+        },
+        {
+            "command": "mvn clean package -f ",
+            "debug": false
+        },
+        {
+            "command": "clean package",
+            "debug": false
+        }
+    ],
+    "maven.view": "flat",
+    "java.configuration.updateBuildConfiguration": "automatic"
+}
