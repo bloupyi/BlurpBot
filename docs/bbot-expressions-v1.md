@@ -182,13 +182,34 @@ node go {
 }
 ```
 
-## 6) Limites (V1)
+## 6) Calculs arithmétiques (V1)
 
-- Pas d’opérations arithmétiques (`+`, `-`, etc.) en V1.
-- Pas de propriétés autres que `location.x/y/z` dans les expressions numériques v1.
+Les expressions numériques acceptent maintenant :
+
+- parenthèses : `( ... )`
+- opérateurs : `+`, `-`, `*`, `/`
+- unaire : `-expr`
+
+Exemples :
+
+```bbot
+let tx = @closest_entity.location.x + 1.25
+let ty = (@closest_entity.location.y + @self.location.y) / 2
+leaf teleport {
+  x: @tx
+  y: @ty - 0.2
+  z: @closest_entity.location.z
+}
+```
+
+> Division par 0 : évaluée à `0` (garde-fou runtime).
+
+## 7) Limites (V1)
+
+- Pas de propriétés autres que `location.x/y/z/yaw/pitch` dans les expressions numériques v1.
 - `set_goal.target` n’est pas une “expression d’objet” : c’est un **kind** (un identifiant).
 
-## 7) Comment ajouter une nouvelle expression / un nouvel objet (modulaire)
+## 8) Comment ajouter une nouvelle expression / un nouvel objet (modulaire)
 
 La règle d’or : ajouter un nouveau support = 3 étapes :
 
@@ -254,7 +275,7 @@ Exemple futur : `@current_target.health` ou une distance.
    - soit dans les fabriques des feuilles/conditions concernées (`BbotBehaviorRegistries`)
    - soit en généralisant les fonctions `resolveRangeExpr`, etc. pour accepter la nouvelle `ValueExpr`
 
-## 8) Résumé rapide (à retenir)
+## 9) Résumé rapide (à retenir)
 
 - `$...` = réglage `BotSettings`
 - `@...` = runtime root ou variable locale

@@ -42,9 +42,14 @@ public final class BbotModel {
         PITCH
     }
 
+    public enum ArithmeticOp {
+        ADD, SUB, MUL, DIV
+    }
+
     public sealed interface ValueExpr
             permits ValueExpr.NumberVal, ValueExpr.StringVal, ValueExpr.SettingRef,
-                    ValueExpr.DynamicVarRef, ValueExpr.DynamicLocationComponent {
+                    ValueExpr.DynamicVarRef, ValueExpr.DynamicLocationComponent,
+                    ValueExpr.UnaryNeg, ValueExpr.BinaryOp {
         record NumberVal(double value) implements ValueExpr {
         }
 
@@ -67,6 +72,12 @@ public final class BbotModel {
          * Numeric expression : {@code @root.location.x/y/z}.
          */
         record DynamicLocationComponent(String root, DynamicLocationAxis axis) implements ValueExpr {
+        }
+
+        record UnaryNeg(ValueExpr value) implements ValueExpr {
+        }
+
+        record BinaryOp(ValueExpr left, ArithmeticOp op, ValueExpr right) implements ValueExpr {
         }
     }
 }

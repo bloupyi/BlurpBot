@@ -9,6 +9,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.util.Vector;
 
 import fr.bloup.blurpbot.api.BotManager;
+import fr.bloup.blurpbot.core.BotPlayer;
 
 public class BotKnockbackListener implements Listener {
     private final BotManager botManager;
@@ -22,6 +23,10 @@ public class BotKnockbackListener implements Listener {
         Entity victim = event.getEntity();
         Entity damager = event.getDamager();
         if (victim == null || damager == null) return;
+
+        // Réaction de knockback uniquement pour nos bots, et seulement si le réglage l'autorise.
+        BotPlayer bot = botManager.getBot(victim.getUniqueId());
+        if (bot == null || !bot.getSettings().isKnockbackEnabled()) return;
 
         Vector away = victim.getLocation().toVector().subtract(damager.getLocation().toVector());
         away.setY(0);
@@ -43,7 +48,7 @@ public class BotKnockbackListener implements Listener {
         away.normalize().multiply(horizontal);
         away.setY(vertical);
 
-        botManager.applyKnockback(victim.getUniqueId(), away);
+        bot.applyImpulse(away);
     }
 }
 

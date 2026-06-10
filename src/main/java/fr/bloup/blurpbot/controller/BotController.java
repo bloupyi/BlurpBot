@@ -15,6 +15,8 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pose;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
@@ -38,6 +40,8 @@ public class BotController {
     private double simulatedVerticalVelocity = 0.0;
     private boolean movedThisTick = false;
     private int knockbackPriorityTicks = 0;
+    /** True tant que l'invisibilité a été posée par l'effet Invisibility (pour la retirer à l'expiration). */
+    private boolean invisibilityFromEffect = false;
     private final AStarPathFinder pathFinder;
     private final JavaPlugin plugin;
     /** Incrémenté à chaque nouvelle recherche async ; les callbacks obsolètes sont ignorés. */
@@ -118,6 +122,29 @@ public class BotController {
         movedThisTick = false;
         lateralUnstuckMode = false;
         jumpConsumedThisTick = false;
+        syncInvisibilityFromEffect();
+    }
+
+    /**
+     * Reflète l'effet Invisibility sur le flag d'entité (visible des autres joueurs). Les faux
+     * joueurs n'étant pas tickés par le serveur pour les effets, on applique l'état nous-mêmes.
+     * On ne touche au flag que s'il a été posé par cet effet, pour ne pas écraser une invisibilité
+     * réglée par ailleurs.
+     */
+    private void syncInvisibilityFromEffect() {
+        if (!entity.isValid()) {
+            return;
+        }
+        boolean want = effectLevel(PotionEffectType.INVISIBILITY) > 0;
+        if (want) {
+            if (!entity.isInvisible()) {
+                entity.setInvisible(true);
+            }
+            invisibilityFromEffect = true;
+        } else if (invisibilityFromEffect) {
+            entity.setInvisible(false);
+            invisibilityFromEffect = false;
+        }
     }
 
     public void endTick() {
@@ -175,6 +202,23 @@ public class BotController {
         float yaw = (float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ()));
         float pitch = (float) Math.toDegrees(-Math.atan2(dir.getY(), Math.sqrt(dir.getX() * dir.getX() + dir.getZ() * dir.getZ())));
         applyEntityRotation(yaw, pitch);
+    }
+
+    /**
+     * Oriente le bot (avec synchronisation tête/corps NMS pour les faux joueurs).
+     */
+    public void setRotation(float yaw, float pitch) {
+        if (!entity.isValid()) return;
+        if (Float.isNaN(yaw) || Float.isNaN(pitch)) return;
+        applyEntityRotation(yaw, pitch);
+    }
+
+    /**
+     * Arme un saut : le prochain pas physique décollera si le bot est au sol (intégré au solveur,
+     * donc pas de « super saut »). Sans effet en l'air.
+     */
+    public void requestJump() {
+        jumpIntentTicks = Math.max(jumpIntentTicks, 3);
     }
 
     public void attack(Entity target) {
@@ -320,13 +364,94 @@ public class BotController {
         knockbackPriorityTicks = Math.max(knockbackPriorityTicks, 7);
     }
 
+    /**
+     * Téléporte le bot puis remet à zéro l'état de navigation et la physique simulée, afin que le
+     * pas physique suivant reparte proprement de la nouvelle position. Sans ce reset, la vélocité
+     * simulée et le chemin courant « combattraient » la téléportation (dérive, retour vers l'ancien
+     * waypoint).
+     *
+     * @return {@code true} si la téléportation a été appliquée.
+     */
+    public boolean teleport(Location loc) {
+        if (loc == null || loc.getWorld() == null || !entity.isValid()) {
+            return false;
+        }
+        boolean ok = entity.teleport(loc);
+        resetSimulatedMotion();
+        return ok;
+    }
+
+    /**
+     * Remet à zéro la vélocité simulée ainsi que tout l'état de cheminement / désencastrement.
+     * Utilisé après une téléportation, ou pour stopper net un bot piloté par script.
+     */
+    public void resetSimulatedMotion() {
+        simulatedHorizontalVelocity = new Vector(0, 0, 0);
+        simulatedVerticalVelocity = 0.0;
+        currentPath = List.of();
+        currentPathIndex = 0;
+        nextRepathAtMs = 0L;
+        lastGoal = null;
+        lastProgressLoc = null;
+        stuckTicks = 0;
+        unstuckTarget = null;
+        jumpIntentTicks = 0;
+        manualJumpTicks = 0;
+        upwardVelocityGuardTicks = 0;
+        knockbackPriorityTicks = 0;
+        if (entity.isValid()) {
+            entity.setVelocity(new Vector(0, 0, 0));
+        }
+    }
+
+    /**
+     * Vélocité « fake » : la vélocité physique simulée appliquée chaque tick au faux joueur
+     * (composantes horizontales x/z + verticale y). Distincte de {@link LivingEntity#getVelocity()},
+     * que le solveur de pas écrase à chaque tick.
+     */
+    public Vector getFakeVelocity() {
+        return new Vector(
+                simulatedHorizontalVelocity.getX(),
+                simulatedVerticalVelocity,
+                simulatedHorizontalVelocity.getZ()
+        );
+    }
+
+    /**
+     * Remplace la vélocité simulée (voir {@link #getFakeVelocity()}). Sera consommée par le prochain
+     * pas physique. Les vecteurs non finis (NaN/Infini) sont ignorés.
+     */
+    public void setFakeVelocity(Vector velocity) {
+        if (velocity == null || !isFiniteVector(velocity)) {
+            return;
+        }
+        simulatedHorizontalVelocity = new Vector(velocity.getX(), 0, velocity.getZ());
+        simulatedVerticalVelocity = velocity.getY();
+    }
+
+    /**
+     * Ajoute un delta à la vélocité simulée (voir {@link #getFakeVelocity()}), sans déclencher la
+     * priorité « knockback » de {@link #applyExternalImpulse(Vector)}.
+     */
+    public void addFakeVelocity(Vector velocity) {
+        if (velocity == null || !isFiniteVector(velocity)) {
+            return;
+        }
+        simulatedHorizontalVelocity.add(new Vector(velocity.getX(), 0, velocity.getZ()));
+        simulatedVerticalVelocity += velocity.getY();
+    }
+
     /** Vitesses cibles (blocs/tick) proches du joueur vanilla (~0,216 marche, ~0,280 sprint). */
     private double computeMoveSpeed(double distSq) {
+        double base;
         if (settings.isSprintEnabled()) {
-            return settings.getMoveSpeedSprint();
+            base = settings.getMoveSpeedSprint();
+        } else if (distSq > 16.0) {
+            base = settings.getMoveSpeedWalk();
+        } else {
+            base = 0.18;
         }
-        if (distSq > 16.0) return settings.getMoveSpeedWalk();
-        return 0.18;
+        return base * movementSpeedMultiplier();
     }
 
     private double computePlayerMoveSpeed(Vector desiredMoveDir) {
@@ -345,11 +470,45 @@ public class BotController {
         // Minecraft-like feel:
         // - looking mostly in movement direction => sprint
         // - sideways/backwards => slower walk
+        double base;
         if (align > 0.72) {
-            return settings.isSprintEnabled() ? settings.getMoveSpeedSprint() : settings.getMoveSpeedWalk();
+            base = settings.isSprintEnabled() ? settings.getMoveSpeedSprint() : settings.getMoveSpeedWalk();
+        } else if (align < -0.25) {
+            base = settings.getMoveSpeedBackward();
+        } else {
+            base = settings.getMoveSpeedWalk();
         }
-        if (align < -0.25) return settings.getMoveSpeedBackward();
-        return settings.getMoveSpeedWalk();
+        return base * movementSpeedMultiplier();
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Effets de potion affectant la physique simulée (Speed/Slowness, Jump Boost, Levitation,
+    // Slow Falling, Dolphin's Grace). Les effets de dégâts/santé (Strength, Poison, Regen…)
+    // s'appliquent déjà nativement côté serveur, indépendamment du mouvement simulé.
+    // ----------------------------------------------------------------------------------------
+
+    /** Niveau effectif d'un effet (1 = niveau I), ou 0 si absent. */
+    private int effectLevel(PotionEffectType type) {
+        PotionEffect e = entity.getPotionEffect(type);
+        return e == null ? 0 : e.getAmplifier() + 1;
+    }
+
+    /**
+     * Multiplicateur de vitesse horizontale façon vanilla (modificateurs MULTIPLY_TOTAL) :
+     * +20% par niveau de Speed, −15% par niveau de Slowness.
+     */
+    private double movementSpeedMultiplier() {
+        int speed = effectLevel(PotionEffectType.SPEED);
+        int slow = effectLevel(PotionEffectType.SLOWNESS);
+        if (speed == 0 && slow == 0) {
+            return 1.0;
+        }
+        return Math.max(0.0, 1.0 + 0.20 * speed - 0.15 * slow);
+    }
+
+    /** Vélocité de saut, augmentée de 0,1 bloc/tick par niveau de Jump Boost (vanilla). */
+    private double effectiveJumpVelocity() {
+        return settings.getJumpVelocity() + 0.10 * effectLevel(PotionEffectType.JUMP_BOOST);
     }
 
     private void applyStrafeJitter(Vector dir, double distSq) {
@@ -404,11 +563,17 @@ public class BotController {
 
         boolean inWater = BlockCollisionHelper.bodyTouchesWater(cur);
 
+        // Effets de potion modifiant la physique de ce pas.
+        int levitationLvl = effectLevel(PotionEffectType.LEVITATION);
+        boolean slowFalling = effectLevel(PotionEffectType.SLOW_FALLING) > 0;
+        boolean dolphinsGrace = effectLevel(PotionEffectType.DOLPHINS_GRACE) > 0;
+
         Vector waterFlow = inWater ? estimateWaterFlow(cur) : new Vector(0, 0, 0);
 
         Vector desired = horizontalDelta.clone();
         if (inWater) {
-            desired.multiply(0.32);
+            // Dolphin's Grace : nage quasi pleine vitesse au lieu de la forte traînée de l'eau.
+            desired.multiply(dolphinsGrace ? 0.78 : 0.32);
         }
         // Stay glued into the ladder column: waypoint lookahead can pull sideways off the shaft.
         if (BlockCollisionHelper.touchingClimbable(cur) && desired.lengthSquared() > 1.0e-8) {
@@ -447,7 +612,7 @@ public class BotController {
 
         if (inWater) {
             simulatedHorizontalVelocity.add(waterFlow);
-            simulatedHorizontalVelocity.multiply(0.90);
+            simulatedHorizontalVelocity.multiply(dolphinsGrace ? 0.96 : 0.90);
         }
 
         // Ne PAS tester le sol sous (pos + vélocité) : au bord d'un bloc ça échoue toujours → onGround faux → jamais de saut.
@@ -464,14 +629,19 @@ public class BotController {
             }
         }
 
+        // Levitation : annule la gravité et fait monter (même au sol), comme en vanilla. Prioritaire.
+        if (levitationLvl > 0 && !climbing && !inWater) {
+            double target = 0.05 * levitationLvl;
+            simulatedVerticalVelocity += (target - simulatedVerticalVelocity) * 0.2;
+        }
         // Still moving up from our own impulse or NMS: do not arm another "ground" jump (coyote / hitbox noise).
-        if (onGround && jumpNeededAhead && !inWater && !climbing && !jumpConsumedThisTick
+        else if (onGround && jumpNeededAhead && !inWater && !climbing && !jumpConsumedThisTick
                 && simulatedVerticalVelocity <= 0.12) {
             // Fixed jump impulse: avoid stacking previous positive Y into "super jumps".
             if (simulatedVerticalVelocity > 0.0) {
                 simulatedVerticalVelocity = 0.0;
             }
-            simulatedVerticalVelocity = settings.getJumpVelocity();
+            simulatedVerticalVelocity = effectiveJumpVelocity();
             jumpIntentTicks = 0;
             manualJumpTicks = 18;
             upwardVelocityGuardTicks = 18;
@@ -490,10 +660,13 @@ public class BotController {
                 simulatedVerticalVelocity -= 0.02;
             } else {
                 // Minecraft-like gravity approximation while airborne/in motion.
-                simulatedVerticalVelocity -= 0.08;
+                // Slow Falling : gravité fortement réduite (chute lente, pas de dégâts de chute).
+                double gravity = slowFalling ? 0.01 : 0.08;
+                double terminal = slowFalling ? -0.70 : -3.92;
+                simulatedVerticalVelocity -= gravity;
                 simulatedVerticalVelocity *= 0.98;
-                if (simulatedVerticalVelocity < -3.92) {
-                    simulatedVerticalVelocity = -3.92;
+                if (simulatedVerticalVelocity < terminal) {
+                    simulatedVerticalVelocity = terminal;
                 }
             }
         } else if (onGround && simulatedVerticalVelocity < 0.0) {
@@ -548,7 +721,8 @@ public class BotController {
 
         // Sans mouvement horizontal, aucun snap dans applyHorizontalSubstep — corrige la légère lévitation
         // après trappes/dalles (raycast vs position NMS) même debout.
-        if (!BlockCollisionHelper.touchingClimbable(next)) {
+        // En Levitation on monte volontairement : ne pas recoller les pieds au sol.
+        if (levitationLvl == 0 && !BlockCollisionHelper.touchingClimbable(next)) {
             double down = Math.max(settings.getStepSnapDownMax(), 0.24);
             snapFeetToNearbyGround(next, settings.getStepSnapUpMax(), down);
         }
@@ -1485,12 +1659,13 @@ public class BotController {
         simulatedHorizontalVelocity.setX(simulatedHorizontalVelocity.getX() + x);
         simulatedHorizontalVelocity.setZ(simulatedHorizontalVelocity.getZ() + z);
         simulatedVerticalVelocity += y;
+        double jumpCap = effectiveJumpVelocity();
         if ((manualJumpTicks > 0 || upwardVelocityGuardTicks > 0)
-                && knockbackPriorityTicks <= 0 && simulatedVerticalVelocity > settings.getJumpVelocity()) {
-            simulatedVerticalVelocity = settings.getJumpVelocity();
+                && knockbackPriorityTicks <= 0 && simulatedVerticalVelocity > jumpCap) {
+            simulatedVerticalVelocity = jumpCap;
         }
-        if (lateralUnstuckMode && knockbackPriorityTicks <= 0 && simulatedVerticalVelocity > settings.getJumpVelocity()) {
-            simulatedVerticalVelocity = settings.getJumpVelocity();
+        if (lateralUnstuckMode && knockbackPriorityTicks <= 0 && simulatedVerticalVelocity > jumpCap) {
+            simulatedVerticalVelocity = jumpCap;
         }
         if (lateralUnstuckMode && knockbackPriorityTicks <= 0 && hasSolidGroundForPhysics(entity.getLocation())
                 && simulatedVerticalVelocity > 0.0) {

@@ -2,8 +2,13 @@ package fr.bloup.blurpbot.core;
 
 import lombok.Getter;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 import org.bukkit.entity.Zombie;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
@@ -12,6 +17,7 @@ import fr.bloup.blurpbot.BlurpBot;
 import fr.bloup.blurpbot.api.Bot;
 import fr.bloup.blurpbot.bbot.BotBehaviorTreeLoader;
 import fr.bloup.blurpbot.brain.BotBrain;
+import fr.bloup.blurpbot.controller.BotController;
 import fr.bloup.blurpbot.decision.BehaviorTree;
 import fr.bloup.blurpbot.goal.GoalTargetKind;
 import fr.bloup.blurpbot.nms.NmsFakePlayerFactory;
@@ -181,8 +187,235 @@ public class BotPlayer implements Bot {
         }
     }
 
+    // ----------------------------------------------------------------------------------------
+    // État / requêtes
+    // ----------------------------------------------------------------------------------------
+
+    @Override
+    public Location getLocation() {
+        return (entity != null && entity.isValid()) ? entity.getLocation() : null;
+    }
+
+    @Override
+    public World getWorld() {
+        return entity != null ? entity.getWorld() : null;
+    }
+
+    @Override
+    public boolean isValid() {
+        return entity != null && entity.isValid() && !entity.isDead();
+    }
+
+    @Override
+    public String getName() {
+        return entity != null ? entity.getCustomName() : null;
+    }
+
+    @Override
+    public double getHealth() {
+        return entity != null ? entity.getHealth() : 0.0;
+    }
+
+    @Override
+    public double getMaxHealth() {
+        if (entity == null) {
+            return 0.0;
+        }
+        AttributeInstance attr = entity.getAttribute(Attribute.MAX_HEALTH);
+        return attr != null ? attr.getValue() : entity.getHealth();
+    }
+
+    @Override
+    public Vector getVelocity() {
+        return (entity != null && entity.isValid()) ? entity.getVelocity() : new Vector(0, 0, 0);
+    }
+
+    @Override
+    public boolean isOnGround() {
+        return entity != null && entity.isValid() && entity.isOnGround();
+    }
+
+    @Override
+    public boolean isSneaking() {
+        return entity instanceof Player p && p.isSneaking();
+    }
+
+    @Override
+    public boolean isSprinting() {
+        return entity instanceof Player p && p.isSprinting();
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Mouvement / navigation
+    // ----------------------------------------------------------------------------------------
+
+    @Override
+    public boolean teleport(Location location) {
+        return brain.teleport(location);
+    }
+
+    @Override
+    public void moveTo(Location target) {
+        moveTo(target, settings.getStopRange());
+    }
+
+    @Override
+    public void moveTo(Location target, double stopRange) {
+        if (target == null) {
+            return;
+        }
+        Location snapshot = target.clone();
+        brain.enqueueMovement(c -> c.moveTo(snapshot, stopRange));
+    }
+
+    @Override
+    public void stop() {
+        brain.enqueueMovement(BotController::stop);
+    }
+
+    @Override
+    public void lookAt(Location target) {
+        if (target == null) {
+            return;
+        }
+        Location snapshot = target.clone();
+        brain.enqueueAction(c -> c.lookAt(snapshot));
+    }
+
+    @Override
+    public void lookAt(Entity target) {
+        if (target == null) {
+            return;
+        }
+        // Résolution de la position à l'exécution (la cible peut bouger d'ici le prochain tick).
+        brain.enqueueAction(c -> {
+            if (!target.isValid()) {
+                return;
+            }
+            Location at = (target instanceof LivingEntity living) ? living.getEyeLocation() : target.getLocation();
+            c.lookAt(at);
+        });
+    }
+
+    @Override
+    public void setRotation(float yaw, float pitch) {
+        brain.enqueueAction(c -> c.setRotation(yaw, pitch));
+    }
+
+    @Override
+    public void jump() {
+        brain.enqueueAction(BotController::requestJump);
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Vélocité simulée / impulsions
+    // ----------------------------------------------------------------------------------------
+
+    @Override
+    public Vector getFakeVelocity() {
+        return brain.getFakeVelocity();
+    }
+
+    @Override
+    public void setFakeVelocity(Vector velocity) {
+        brain.setFakeVelocity(velocity);
+    }
+
+    @Override
+    public void addFakeVelocity(Vector velocity) {
+        brain.addFakeVelocity(velocity);
+    }
+
+    @Override
     public void applyImpulse(Vector impulse) {
         brain.applyImpulse(impulse);
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Actions / combat
+    // ----------------------------------------------------------------------------------------
+
+    @Override
+    public void attack(Entity target) {
+        attackWithCooldown(target, 0L);
+    }
+
+    @Override
+    public void attackWithCooldown(Entity target, long cooldownMs) {
+        if (target == null) {
+            return;
+        }
+        brain.enqueueAction(c -> c.attackWithCooldown(target, cooldownMs));
+    }
+
+    @Override
+    public void swingHand(boolean mainHand) {
+        brain.enqueueAction(c -> c.trySwingHand(mainHand));
+    }
+
+    @Override
+    public void setPose(Pose pose) {
+        if (pose == null) {
+            return;
+        }
+        brain.enqueueAction(c -> c.trySetPose(pose));
+    }
+
+    @Override
+    public boolean hasLineOfSight(Entity target) {
+        return brain.getController().hasMeleeLineOfSight(target);
+    }
+
+    @Override
+    public boolean isWithinMeleeRange(Entity target, double attackRange) {
+        return brain.getController().isTargetWithinMeleeRange(target, attackRange);
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // Apparence / état mutable
+    // ----------------------------------------------------------------------------------------
+
+    @Override
+    public void setName(String name) {
+        if (entity != null && entity.isValid()) {
+            applyDisplayName(entity, name);
+        }
+    }
+
+    @Override
+    public boolean setHealth(double health) {
+        if (entity == null || !entity.isValid()) {
+            return false;
+        }
+        try {
+            double max = getMaxHealth();
+            double clamped = Math.max(0.0, Math.min(health, max > 0 ? max : health));
+            entity.setHealth(clamped);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    @Override
+    public void setSneaking(boolean sneaking) {
+        if (entity instanceof Player p) {
+            p.setSneaking(sneaking);
+        }
+    }
+
+    @Override
+    public void setSprinting(boolean sprinting) {
+        if (entity instanceof Player p) {
+            p.setSprinting(sprinting);
+        }
+    }
+
+    @Override
+    public void setGravity(boolean gravity) {
+        if (entity != null) {
+            entity.setGravity(gravity);
+        }
     }
 
     public void setDebugEnabled(boolean debugEnabled, UUID viewerId) {

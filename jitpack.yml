@@ -1,0 +1,6 @@
+# Configuration JitPack — https://jitpack.io/docs/BUILDING/
+# Fixe le JDK 21 (sinon JitPack utilise un JDK plus ancien et le build échoue).
+jdk:
+  - openjdk21
+install:
+  - mvn install -DskipTests

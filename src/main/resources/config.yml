@@ -14,6 +14,8 @@ bot:
     priority-move: 50
     priority-idle: 1
     sprint-enabled: true
+    # Réaction de knockback quand le bot est touché. false = bot inébranlable.
+    knockback-enabled: true
     move-speed-sprint: 0.42
     move-speed-walk: 0.35
     move-speed-backward: 0.11

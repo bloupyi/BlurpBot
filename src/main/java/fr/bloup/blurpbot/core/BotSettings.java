@@ -25,6 +25,8 @@ public class BotSettings {
     private int priorityMove = 50;
     private int priorityIdle = 1;
     private boolean sprintEnabled = true;
+    /** Réaction de knockback quand le bot est touché ({@code BotKnockbackListener}). false = bot inébranlable. */
+    private boolean knockbackEnabled = true;
     private double moveSpeedSprint = 0.280;
     private double moveSpeedWalk = 0.216;
     private double moveSpeedBackward = 0.11;
@@ -72,6 +74,7 @@ public class BotSettings {
         out.priorityMove = this.priorityMove;
         out.priorityIdle = this.priorityIdle;
         out.sprintEnabled = this.sprintEnabled;
+        out.knockbackEnabled = this.knockbackEnabled;
         out.moveSpeedSprint = this.moveSpeedSprint;
         out.moveSpeedWalk = this.moveSpeedWalk;
         out.moveSpeedBackward = this.moveSpeedBackward;
@@ -123,6 +126,7 @@ public class BotSettings {
         this.priorityMove = o.priorityMove;
         this.priorityIdle = o.priorityIdle;
         this.sprintEnabled = o.sprintEnabled;
+        this.knockbackEnabled = o.knockbackEnabled;
         this.moveSpeedSprint = o.moveSpeedSprint;
         this.moveSpeedWalk = o.moveSpeedWalk;
         this.moveSpeedBackward = o.moveSpeedBackward;
@@ -172,6 +176,7 @@ public class BotSettings {
                 case PRIORITY_MOVE -> this.priorityMove = Integer.parseInt(value);
                 case PRIORITY_IDLE -> this.priorityIdle = Integer.parseInt(value);
                 case SPRINT_ENABLED -> this.sprintEnabled = parseBooleanStrict(value);
+                case KNOCKBACK_ENABLED -> this.knockbackEnabled = parseBooleanStrict(value);
                 case MOVE_SPEED_SPRINT -> this.moveSpeedSprint = Double.parseDouble(value);
                 case MOVE_SPEED_WALK -> this.moveSpeedWalk = Double.parseDouble(value);
                 case MOVE_SPEED_BACKWARD -> this.moveSpeedBackward = Double.parseDouble(value);

@@ -61,8 +61,7 @@ public final class TeleportLeaf implements BehaviorNode {
         if (pitchExpr != null && Float.isNaN(pitch)) return NodeStatus.FAILURE;
 
         Location to = new Location(w, x, y, z, yaw, pitch);
-        ent.teleport(to);
-        return NodeStatus.SUCCESS;
+        return context.controller().teleport(to) ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
     }
 
     private World resolveWorld(LivingEntity ent) {

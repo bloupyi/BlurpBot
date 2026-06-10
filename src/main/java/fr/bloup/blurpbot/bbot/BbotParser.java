@@ -9,6 +9,7 @@ import java.util.Map;
 import fr.bloup.blurpbot.bbot.BbotModel.BotBlock;
 import fr.bloup.blurpbot.bbot.BbotModel.ConditionBlock;
 import fr.bloup.blurpbot.bbot.BbotModel.Document;
+import fr.bloup.blurpbot.bbot.BbotModel.ArithmeticOp;
 import fr.bloup.blurpbot.bbot.BbotModel.DynamicLocationAxis;
 import fr.bloup.blurpbot.bbot.BbotModel.LeafBlock;
 import fr.bloup.blurpbot.bbot.BbotModel.LetDirective;
@@ -192,7 +193,55 @@ public final class BbotParser {
     }
 
     private ValueExpr parseValueExpr() throws BbotParseException {
+        return parseAddSubExpr();
+    }
+
+    private ValueExpr parseAddSubExpr() throws BbotParseException {
+        ValueExpr left = parseMulDivExpr();
+        while (isType(BbotTokenType.PLUS) || isType(BbotTokenType.MINUS)) {
+            BbotTokenType opTok = cur.type();
+            next();
+            ValueExpr right = parseMulDivExpr();
+            left = new ValueExpr.BinaryOp(
+                    left,
+                    opTok == BbotTokenType.PLUS ? ArithmeticOp.ADD : ArithmeticOp.SUB,
+                    right
+            );
+        }
+        return left;
+    }
+
+    private ValueExpr parseMulDivExpr() throws BbotParseException {
+        ValueExpr left = parseUnaryExpr();
+        while (isType(BbotTokenType.STAR) || isType(BbotTokenType.SLASH)) {
+            BbotTokenType opTok = cur.type();
+            next();
+            ValueExpr right = parseUnaryExpr();
+            left = new ValueExpr.BinaryOp(
+                    left,
+                    opTok == BbotTokenType.STAR ? ArithmeticOp.MUL : ArithmeticOp.DIV,
+                    right
+            );
+        }
+        return left;
+    }
+
+    private ValueExpr parseUnaryExpr() throws BbotParseException {
+        if (isType(BbotTokenType.MINUS)) {
+            next();
+            return new ValueExpr.UnaryNeg(parseUnaryExpr());
+        }
+        return parsePrimaryExpr();
+    }
+
+    private ValueExpr parsePrimaryExpr() throws BbotParseException {
         return switch (cur.type()) {
+            case LPAREN -> {
+                next();
+                ValueExpr inner = parseValueExpr();
+                expect(BbotTokenType.RPAREN);
+                yield inner;
+            }
             case NUMBER -> {
                 double v = Double.parseDouble(cur.text());
                 next();

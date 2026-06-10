@@ -61,6 +61,42 @@ public class BotManager {
         bot.applyImpulse(impulse);
     }
 
+    /**
+     * Téléporte le bot et remet à zéro sa navigation / vélocité simulée.
+     *
+     * @return {@code true} si le bot existe et que la téléportation a été appliquée.
+     */
+    public boolean teleport(UUID id, Location location) {
+        BotPlayer bot = bots.get(id);
+        if (bot == null) return false;
+        return bot.teleport(location);
+    }
+
+    /**
+     * @return la vélocité « fake » (physique simulée) du bot, ou {@code null} s'il n'existe pas.
+     * @see Bot#getFakeVelocity()
+     */
+    public Vector getFakeVelocity(UUID id) {
+        BotPlayer bot = bots.get(id);
+        return bot == null ? null : bot.getFakeVelocity();
+    }
+
+    /** Remplace la vélocité « fake » du bot. @return {@code true} si le bot existe. */
+    public boolean setFakeVelocity(UUID id, Vector velocity) {
+        BotPlayer bot = bots.get(id);
+        if (bot == null) return false;
+        bot.setFakeVelocity(velocity);
+        return true;
+    }
+
+    /** Ajoute un delta à la vélocité « fake » du bot. @return {@code true} si le bot existe. */
+    public boolean addFakeVelocity(UUID id, Vector velocity) {
+        BotPlayer bot = bots.get(id);
+        if (bot == null) return false;
+        bot.addFakeVelocity(velocity);
+        return true;
+    }
+
     public boolean setDebug(UUID id, boolean enabled, UUID viewerId) {
         BotPlayer bot = bots.get(id);
         if (bot == null) return false;

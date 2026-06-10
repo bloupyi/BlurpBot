@@ -83,7 +83,7 @@ node <id> {
 - `**when:`** (optionnel) : une `**sequence**` de `**condition**` (toutes doivent passer). Si absent, le nœud est toujours “éligible” côté garde (seule la priorité compte).
 - `**leaf**` / `**run**` : actions exécutées dans l’ordre d’apparition quand ce nœud est sélectionné (stop si une action renvoie `RUNNING`).
 - `**let <name> = <expr>**` (optionnel, dans un `node`) : déclare une variable locale pour ce nœud.
-  - `expr` v1 (numérique) : `number`, `@root.location.x|y|z`, `@<name>` (variable déjà déclarée), ou `$<setting-key>` (si l’argument supporte déjà les références settings ; ex. `range`, `stop_range`, `cooldown_ms`).
+  - `expr` v1 (numérique) : `number`, `@root.location.x|y|z|yaw|pitch`, `@<name>` (variable déjà déclarée), `$<setting-key>` (si l’argument supporte déjà les références settings ; ex. `range`, `stop_range`, `cooldown_ms`) et calculs `+ - * /` avec parenthèses.
   - racines runtime v1 : `@self`, `@closest_player`, `@closest_entity`, `@closest_monster`, `@current_target`.
 
 ## Conditions (`when: sequence { ... }`)
@@ -117,6 +117,7 @@ when: sequence {
 | `entity_pose`   | Pose d’affichage vanilla (`LivingEntity#setPose`) | `pose:` nom d’énum **Bukkit** (ex. `SWIMMING`, `CROUCHING`, `STANDING`) — ident ou `"chaîne"` |
 | `set_goal`      | Fixe l’objectif de déplacement (priorité scriptée, défaut 150) | `target:` + optionnel `priority:` ; voir [Objectif scripté (`set_goal`)](#objectif-scripté-set_goal) |
 | `teleport`      | Téléporte le bot à une position calculée runtime | `x:`, `y:`, `z:` (number ou `@root.location.{x|y|z|yaw|pitch}`) ; optionnel `world:`, `yaw:`, `pitch:` |
+| `look_at`       | Oriente le bot vers une entité ou une location | soit `target:` (`self`, `closest_entity`, `closest_player`, `closest_monster`, `current_target`), soit `x:`, `y:`, `z:` (expressions numériques) |
 
 
 Les références `**$...`** sur les feuilles (cooldown, portée d’arrêt, etc.) utilisent en général les valeurs **runtime** des **réglages** (`BotSettings`). **Exception** : sur `**set_goal**`, la syntaxe `**$...**` sert aussi aux **cibles dynamiques** (`$closest-player`, etc.) — ce ne sont pas des clés de `config.yml` / `/bb config`.

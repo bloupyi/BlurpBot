@@ -82,9 +82,8 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>github-bloup</id>
-            <name>BlurpAPI</name>
-            <url>https://maven.pkg.github.com/bloupyi/BlurpAPI</url>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 
@@ -107,9 +106,9 @@
             <version>0.10.2</version>
         </dependency>
         <dependency>
-            <groupId>fr.bloup</groupId>
-            <artifactId>blurpapi</artifactId>
-            <version>1.4.8</version>
+            <groupId>com.github.bloupyi</groupId>
+            <artifactId>BlurpAPI</artifactId>
+            <version>v1.4.12</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import fr.bloup.blurpbot.decision.leaf.action.AttackTarget;
 import fr.bloup.blurpbot.decision.leaf.action.EntityPoseLeaf;
 import fr.bloup.blurpbot.decision.leaf.action.IdleAction;
+import fr.bloup.blurpbot.decision.leaf.action.LookAtLeaf;
 import fr.bloup.blurpbot.decision.leaf.action.MoveToTarget;
 import fr.bloup.blurpbot.decision.leaf.action.SetGoalAction;
 import fr.bloup.blurpbot.decision.leaf.action.SwingHandLeaf;
@@ -53,6 +54,18 @@ public final class BbotBehaviorRegistries {
                 BbotArgParsing.resolveOptionalDoubleExprStrict(args, "pitch"),
                 BbotArgParsing.resolveOptionalWorldName(args)
         ));
+        registerLeaf("look_at", args -> {
+            String target = BbotArgParsing.resolveOptionalEntityTargetRoot(args, "target");
+            if (target != null && !target.isBlank()) {
+                return new LookAtLeaf(target, null, null, null);
+            }
+            return new LookAtLeaf(
+                    null,
+                    BbotArgParsing.resolveRequiredDoubleExprStrict(args, "x", "look_at"),
+                    BbotArgParsing.resolveRequiredDoubleExprStrict(args, "y", "look_at"),
+                    BbotArgParsing.resolveRequiredDoubleExprStrict(args, "z", "look_at")
+            );
+        });
 
         registerCondition("target_in_range", args -> new IsTargetInRange(BbotArgParsing.resolveRangeExpr(args, "range")));
         registerCondition("has_melee_los", args -> new HasMeleeLineOfSight());

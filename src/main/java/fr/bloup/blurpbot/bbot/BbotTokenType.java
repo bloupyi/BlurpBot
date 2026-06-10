@@ -8,8 +8,14 @@ public enum BbotTokenType {
     AT,
     LBRACE,
     RBRACE,
+    LPAREN,
+    RPAREN,
     COLON,
     DOLLAR,
     EQUALS,
-    DOT
+    DOT,
+    PLUS,
+    MINUS,
+    STAR,
+    SLASH
 }

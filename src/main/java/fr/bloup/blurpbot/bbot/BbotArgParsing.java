@@ -7,6 +7,7 @@ import org.bukkit.entity.Pose;
 import org.bukkit.entity.LivingEntity;
 
 import fr.bloup.blurpbot.bbot.BbotModel.ValueExpr;
+import fr.bloup.blurpbot.bbot.BbotModel.ArithmeticOp;
 import fr.bloup.blurpbot.bbot.BbotModel.DynamicLocationAxis;
 import fr.bloup.blurpbot.bbot.expr.BbotDoubleExpr;
 import fr.bloup.blurpbot.bbot.expr.BbotIntExpr;
@@ -80,16 +81,7 @@ public final class BbotArgParsing {
         if (v == null) {
             return ctx -> -1;
         }
-        if (v instanceof ValueExpr.NumberVal n) {
-            return ctx -> n.value();
-        }
-        if (v instanceof ValueExpr.SettingRef) {
-            return ctx -> -1;
-        }
-        if (v instanceof ValueExpr.DynamicLocationComponent c) {
-            return ctx -> evalDynamicLocationAxis(ctx, c.root(), c.axis(), -1);
-        }
-        throw new BbotParseException(1, key + " must be a number, $setting, or @root.location.{x|y|z}");
+        return resolveNumericExpr(v, true, -1.0, key + " must be a numeric expression, $setting, or @root.location.{x|y|z|yaw|pitch}");
     }
 
     public static fr.bloup.blurpbot.bbot.expr.BbotDoubleExpr resolveStopRangeExpr(Map<String, ValueExpr> args) throws BbotParseException {
@@ -101,16 +93,8 @@ public final class BbotArgParsing {
         if (v == null) {
             return ctx -> -1L;
         }
-        if (v instanceof ValueExpr.NumberVal n) {
-            return ctx -> (long) n.value();
-        }
-        if (v instanceof ValueExpr.SettingRef) {
-            return ctx -> -1L;
-        }
-        if (v instanceof ValueExpr.DynamicLocationComponent c) {
-            return ctx -> (long) evalDynamicLocationAxis(ctx, c.root(), c.axis(), -1);
-        }
-        throw new BbotParseException(1, "cooldown_ms must be a number, $setting, or @root.location.{x|y|z}");
+        BbotDoubleExpr expr = resolveNumericExpr(v, true, -1.0, "cooldown_ms must be a numeric expression, $setting, or @root.location.{x|y|z|yaw|pitch}");
+        return ctx -> (long) expr.eval(ctx);
     }
 
     /**
@@ -124,23 +108,15 @@ public final class BbotArgParsing {
      * - $settings (BotSettings) dans ce contexte
      */
     public static fr.bloup.blurpbot.bbot.expr.BbotDoubleExpr resolveRequiredDoubleExprStrict(Map<String, ValueExpr> args, String key) throws BbotParseException {
+        return resolveRequiredDoubleExprStrict(args, key, "teleport");
+    }
+
+    public static fr.bloup.blurpbot.bbot.expr.BbotDoubleExpr resolveRequiredDoubleExprStrict(Map<String, ValueExpr> args, String key, String actionName) throws BbotParseException {
         ValueExpr v = args.get(key);
         if (v == null) {
-            throw new BbotParseException(1, "teleport requires " + key + ": <number or @root.location.{x|y|z|yaw|pitch}>");
+            throw new BbotParseException(1, actionName + " requires " + key + ": <numeric expression or @root.location.{x|y|z|yaw|pitch}>");
         }
-        if (v instanceof ValueExpr.NumberVal n) {
-            return ctx -> n.value();
-        }
-        if (v instanceof ValueExpr.DynamicLocationComponent c) {
-            return ctx -> evalDynamicLocationAxis(ctx, c.root(), c.axis(), Double.NaN);
-        }
-        if (v instanceof ValueExpr.SettingRef) {
-            throw new BbotParseException(1, "teleport " + key + " cannot be a $setting ; use number or @root.location.{x|y|z|yaw|pitch}");
-        }
-        if (v instanceof ValueExpr.DynamicVarRef) {
-            throw new BbotParseException(1, "teleport " + key + " refers to unknown/undeclared @var ; check your let declarations");
-        }
-        throw new BbotParseException(1, "teleport " + key + " must be a number or @root.location.{x|y|z|yaw|pitch}");
+        return resolveNumericExpr(v, false, Double.NaN, actionName + " " + key + " must be a numeric expression or @root.location.{x|y|z|yaw|pitch}");
     }
 
     public static fr.bloup.blurpbot.bbot.expr.BbotDoubleExpr resolveOptionalDoubleExprStrict(Map<String, ValueExpr> args, String key) throws BbotParseException {
@@ -148,19 +124,7 @@ public final class BbotArgParsing {
         if (v == null) {
             return null;
         }
-        if (v instanceof ValueExpr.NumberVal n) {
-            return ctx -> n.value();
-        }
-        if (v instanceof ValueExpr.DynamicLocationComponent c) {
-            return ctx -> evalDynamicLocationAxis(ctx, c.root(), c.axis(), Double.NaN);
-        }
-        if (v instanceof ValueExpr.SettingRef) {
-            throw new BbotParseException(1, "teleport " + key + " cannot be a $setting ; use number or @root.location.{x|y|z|yaw|pitch}");
-        }
-        if (v instanceof ValueExpr.DynamicVarRef) {
-            throw new BbotParseException(1, "teleport " + key + " refers to unknown/undeclared @var ; check your let declarations");
-        }
-        throw new BbotParseException(1, "teleport " + key + " must be a number or @root.location.{x|y|z|yaw|pitch}");
+        return resolveNumericExpr(v, false, Double.NaN, "teleport " + key + " must be a numeric expression or @root.location.{x|y|z|yaw|pitch}");
     }
 
     public static String resolveOptionalWorldName(Map<String, ValueExpr> args) throws BbotParseException {
@@ -206,17 +170,8 @@ public final class BbotArgParsing {
         if (v == null) {
             return ctx -> defaultVal;
         }
-        if (v instanceof ValueExpr.NumberVal n) {
-            int i = (int) n.value();
-            return ctx -> i;
-        }
-        if (v instanceof ValueExpr.DynamicLocationComponent c) {
-            return ctx -> (int) evalDynamicLocationAxis(ctx, c.root(), c.axis(), -1);
-        }
-        if (v instanceof ValueExpr.SettingRef) {
-            throw new BbotParseException(1, key + " must be a number or @root.location.{x|y|z}, not a BotSetting");
-        }
-        throw new BbotParseException(1, key + " must be a number or @root.location.{x|y|z}");
+        BbotDoubleExpr expr = resolveNumericExpr(v, false, -1, key + " must be a numeric expression or @root.location.{x|y|z|yaw|pitch}");
+        return ctx -> (int) expr.eval(ctx);
     }
 
     private static BbotDoubleExpr requireDoubleExpr(Map<String, ValueExpr> args, String key, double missingValue) throws BbotParseException {
@@ -224,16 +179,78 @@ public final class BbotArgParsing {
         if (v == null) {
             throw new BbotParseException(1, "set_goal requires " + key + " for fixed locations");
         }
+        return resolveNumericExpr(v, false, missingValue, key + " must be a numeric expression or @root.location.{x|y|z|yaw|pitch}");
+    }
+
+    private static BbotDoubleExpr resolveNumericExpr(
+            ValueExpr v,
+            boolean allowSettingRef,
+            double settingMissingValue,
+            String errorMessage
+    ) throws BbotParseException {
         if (v instanceof ValueExpr.NumberVal n) {
             return ctx -> n.value();
         }
         if (v instanceof ValueExpr.DynamicLocationComponent c) {
-            return ctx -> evalDynamicLocationAxis(ctx, c.root(), c.axis(), missingValue);
+            return ctx -> evalDynamicLocationAxis(ctx, c.root(), c.axis(), settingMissingValue);
         }
         if (v instanceof ValueExpr.SettingRef) {
-            throw new BbotParseException(1, key + " cannot be a BotSetting in v1, use @root.location.{x|y|z}");
+            if (!allowSettingRef) {
+                throw new BbotParseException(1, errorMessage);
+            }
+            return ctx -> settingMissingValue;
         }
-        throw new BbotParseException(1, key + " must be a number or @root.location.{x|y|z}");
+        if (v instanceof ValueExpr.UnaryNeg u) {
+            BbotDoubleExpr inner = resolveNumericExpr(u.value(), allowSettingRef, settingMissingValue, errorMessage);
+            return ctx -> -inner.eval(ctx);
+        }
+        if (v instanceof ValueExpr.BinaryOp b) {
+            BbotDoubleExpr left = resolveNumericExpr(b.left(), allowSettingRef, settingMissingValue, errorMessage);
+            BbotDoubleExpr right = resolveNumericExpr(b.right(), allowSettingRef, settingMissingValue, errorMessage);
+            ArithmeticOp op = b.op();
+            return ctx -> switch (op) {
+                case ADD -> left.eval(ctx) + right.eval(ctx);
+                case SUB -> left.eval(ctx) - right.eval(ctx);
+                case MUL -> left.eval(ctx) * right.eval(ctx);
+                case DIV -> {
+                    double denom = right.eval(ctx);
+                    if (Math.abs(denom) < 1.0e-9) {
+                        yield 0.0;
+                    }
+                    yield left.eval(ctx) / denom;
+                }
+            };
+        }
+        throw new BbotParseException(1, errorMessage);
+    }
+
+    public static String resolveOptionalEntityTargetRoot(Map<String, ValueExpr> args, String key) throws BbotParseException {
+        ValueExpr v = args.get(key);
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof ValueExpr.StringVal sv) {
+            return sv.value();
+        }
+        if (v instanceof ValueExpr.DynamicVarRef dv) {
+            return dv.name();
+        }
+        if (v instanceof ValueExpr.SettingRef ref) {
+            return ref.key();
+        }
+        throw new BbotParseException(1, key + " must be an entity target name like closest_entity/current_target");
+    }
+
+    public static LivingEntity resolveRuntimeEntity(BotContext ctx, String rootRaw) {
+        String root = normalizeRoot(rootRaw);
+        return switch (root) {
+            case "self" -> ctx.controller().getEntity();
+            case "closest_player" -> ctx.perception().getClosestPlayer();
+            case "closest_entity" -> ctx.perception().getClosestLivingEntity();
+            case "closest_monster" -> ctx.perception().getClosestMonster();
+            case "current_target" -> ctx.perception().getTarget();
+            default -> null;
+        };
     }
 
     private static String goalTargetIdentifierExpr(ValueExpr v) throws BbotParseException {
@@ -251,15 +268,7 @@ public final class BbotArgParsing {
     }
 
     private static double evalDynamicLocationAxis(BotContext ctx, String rootRaw, DynamicLocationAxis axis, double missingValue) {
-        String root = normalizeRoot(rootRaw);
-        LivingEntity e = switch (root) {
-            case "self" -> ctx.controller().getEntity();
-            case "closest_player" -> ctx.perception().getClosestPlayer();
-            case "closest_entity" -> ctx.perception().getClosestLivingEntity();
-            case "closest_monster" -> ctx.perception().getClosestMonster();
-            case "current_target" -> ctx.perception().getTarget();
-            default -> null;
-        };
+        LivingEntity e = resolveRuntimeEntity(ctx, rootRaw);
         if (e == null || !e.isValid()) {
             return missingValue;
         }

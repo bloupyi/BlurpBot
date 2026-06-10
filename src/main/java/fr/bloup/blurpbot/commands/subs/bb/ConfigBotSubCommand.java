@@ -62,6 +62,7 @@ public class ConfigBotSubCommand implements TabExecutor, PermissionedCommand {
             sender.sendMessage(" - skin-texture=" + (settings.getSkinTexture() == null ? "<unset>" : "<set>"));
             sender.sendMessage(" - skin-signature=" + (settings.getSkinSignature() == null ? "<unset>" : "<set>"));
             sender.sendMessage(" - sprint-enabled=" + settings.isSprintEnabled());
+            sender.sendMessage(" - knockback-enabled=" + settings.isKnockbackEnabled());
             sender.sendMessage(" - move-speed-sprint=" + settings.getMoveSpeedSprint());
             sender.sendMessage(" - move-speed-walk=" + settings.getMoveSpeedWalk());
             sender.sendMessage(" - move-speed-backward=" + settings.getMoveSpeedBackward());

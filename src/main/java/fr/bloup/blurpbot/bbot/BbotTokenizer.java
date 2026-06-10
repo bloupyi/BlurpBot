@@ -29,6 +29,14 @@ public final class BbotTokenizer {
                 pos++;
                 return new BbotToken(BbotTokenType.RBRACE, "}", lineStart);
             }
+            case '(' -> {
+                pos++;
+                return new BbotToken(BbotTokenType.LPAREN, "(", lineStart);
+            }
+            case ')' -> {
+                pos++;
+                return new BbotToken(BbotTokenType.RPAREN, ")", lineStart);
+            }
             case ':' -> {
                 pos++;
                 return new BbotToken(BbotTokenType.COLON, ":", lineStart);
@@ -49,11 +57,30 @@ public final class BbotTokenizer {
                 pos++;
                 return new BbotToken(BbotTokenType.DOT, ".", lineStart);
             }
+            case '+' -> {
+                pos++;
+                return new BbotToken(BbotTokenType.PLUS, "+", lineStart);
+            }
+            case '*' -> {
+                pos++;
+                return new BbotToken(BbotTokenType.STAR, "*", lineStart);
+            }
+            case '/' -> {
+                pos++;
+                return new BbotToken(BbotTokenType.SLASH, "/", lineStart);
+            }
+            case '-' -> {
+                if (pos + 1 < s.length() && Character.isDigit(s.charAt(pos + 1))) {
+                    return readNumber(lineStart);
+                }
+                pos++;
+                return new BbotToken(BbotTokenType.MINUS, "-", lineStart);
+            }
             case '"' -> {
                 return readString(lineStart);
             }
             default -> {
-                if (c == '-' || Character.isDigit(c)) {
+                if (Character.isDigit(c)) {
                     return readNumber(lineStart);
                 }
                 if (isIdentStart(c)) {

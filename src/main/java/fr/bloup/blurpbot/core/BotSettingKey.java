@@ -17,6 +17,7 @@ public enum BotSettingKey {
     PRIORITY_MOVE("priority-move"),
     PRIORITY_IDLE("priority-idle"),
     SPRINT_ENABLED("sprint-enabled"),
+    KNOCKBACK_ENABLED("knockback-enabled"),
     MOVE_SPEED_SPRINT("move-speed-sprint"),
     MOVE_SPEED_WALK("move-speed-walk"),
     MOVE_SPEED_BACKWARD("move-speed-backward"),
