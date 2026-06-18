@@ -88,6 +88,14 @@ public final class NmsFakePlayerFactory {
             Object playerList = minecraftServerClass.getMethod("getPlayerList").invoke(minecraftServer);
             placeNewPlayer(playerList, connection, serverPlayer, cookie);
 
+            // Le fake player nait dans le gamemode par defaut du serveur (server.properties). En
+            // CREATIVE/SPECTATOR, GameType.updatePlayerAbilities met Abilities.invulnerable=true : ce champ
+            // (pilote par le gametype, lu par Player.isInvulnerableTo) est DISTINCT du flag Entity.invulnerable
+            // que Bukkit setInvulnerable() ecrit. Resultat : un bot ne en spectator reste intapable meme
+            // affiche en ADVENTURE. On force SURVIVAL ici pour garantir invulnerable=false quel que soit le
+            // gamemode par defaut du serveur.
+            forceSurvivalGameType(serverPlayer);
+
             // Ne pas utiliser Player.teleport() : plugins / logique Paper peuvent envoyer au spawn du monde par défaut.
             // Forcer position + dimension uniquement côté NMS sur le ServerPlayer.
             nmsTeleportServerPlayerAfterPlace(serverPlayer, serverLevel, spawnLocation);
@@ -378,6 +386,55 @@ public final class NmsFakePlayerFactory {
             throw new NoSuchMethodException(target.getClass().getName() + "#" + name);
         }
         return m.invoke(target, args);
+    }
+
+    /**
+     * Force le ServerPlayer en SURVIVAL puis ecrit directement {@code Abilities.invulnerable=false}.
+     *
+     * <p>Deux champs d'invulnerabilite coexistent sur un joueur NMS : {@code Entity.invulnerable} (ce que
+     * Bukkit {@code setInvulnerable()} ecrit) et {@code Abilities.invulnerable} (pilote par le gametype, lu
+     * par {@code Player.isInvulnerableTo} et donc par {@code CraftLivingEntity.isInvulnerable()}). Un fake
+     * player ne en CREATIVE/SPECTATOR herite de {@code Abilities.invulnerable=true} et reste intapable. On
+     * change le gametype, puis on ecrit le champ directement en filet de securite car la maj d'abilities via
+     * gamemode n'est pas fiable sur un fake player, et on pousse {@code onUpdateAbilities()}.
+     */
+    private static void forceSurvivalGameType(Object serverPlayer) {
+        try {
+            Class<?> gameTypeClass = Class.forName("net.minecraft.world.level.GameType");
+            @SuppressWarnings("unchecked")
+            Object survival = Enum.valueOf((Class<? extends Enum>) gameTypeClass, "SURVIVAL");
+            serverPlayer.getClass().getMethod("setGameMode", gameTypeClass).invoke(serverPlayer, survival);
+        } catch (Throwable ignored) {
+            // Mapping/fork sans setGameMode(GameType) accessible : on s'appuie sur le forcage direct ci-dessous.
+        }
+        try {
+            Object abilities = serverPlayer.getClass().getMethod("getAbilities").invoke(serverPlayer);
+            setBooleanFieldIfPresent(abilities, "invulnerable", false);
+            serverPlayer.getClass().getMethod("onUpdateAbilities").invoke(serverPlayer);
+        } catch (Throwable ignored) {
+            // Best effort : le bot spawn meme si le forcage des abilities echoue.
+        }
+    }
+
+    private static void setBooleanFieldIfPresent(Object target, String fieldName, boolean value) {
+        if (target == null || fieldName == null || fieldName.isBlank()) {
+            return;
+        }
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                var f = type.getDeclaredField(fieldName);
+                if (f.getType() == boolean.class || f.getType() == Boolean.class) {
+                    f.setAccessible(true);
+                    f.setBoolean(target, value);
+                }
+                return;
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            } catch (Throwable ignored) {
+                return;
+            }
+        }
     }
 
     private static void setFloatFieldIfPresent(Object target, String fieldName, float value) {
