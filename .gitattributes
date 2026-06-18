@@ -1,0 +1,6 @@
+# Le wrapper Maven et les scripts shell doivent rester en LF : un CRLF casserait le shebang
+# sur l'environnement Linux de JitPack (./mvnw).
+* text=auto
+mvnw text eol=lf
+*.sh text eol=lf
+mvnw.cmd text eol=crlf

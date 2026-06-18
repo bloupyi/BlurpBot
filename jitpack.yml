@@ -2,5 +2,7 @@
 # Fixe le JDK 21 (sinon JitPack utilise un JDK plus ancien et le build échoue).
 jdk:
   - openjdk21
+# Le Maven de JitPack est trop ancien pour les versions de plugins du pom (maven-compiler-plugin
+# 3.13.0 requiert Maven 3.6.3+). On passe par le Maven Wrapper (Maven 3.9.9) embarqué dans le repo.
 install:
-  - mvn install -DskipTests
+  - ./mvnw -DskipTests install
